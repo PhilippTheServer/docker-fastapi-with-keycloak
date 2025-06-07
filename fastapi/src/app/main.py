@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 
 # from routers.name import endpoint (example import, for a router)
-from routers.demo_router import read_demo
+from routers.demo_router import router as demo_router
 
 
 app = FastAPI(title="Demo API")
@@ -28,7 +28,7 @@ app.add_middleware(
 
 # Example router (you can replace this with your actual router)
 # app.include_router(any_router.router)
-app.include_router(read_demo)
+app.include_router(demo_router)
 
 
 if __name__ == "__main__":
