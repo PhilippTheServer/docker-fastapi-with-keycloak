@@ -1,0 +1,20 @@
+services:
+  demo:                             # declare FastAPI service
+    build: ./src                    # build from Dockerfile in src directory
+    expose:                         # expose port to other services in the same network (not publicly accessible)   
+      - "8000"
+    networks:                       # connect to the proxy networks  
+      frontproxy_fnet:
+        ipv4_address: 172.20.20.20  # assign a static IP address in the proxy network
+      backend:                      # connect to the backend network (needed for db connection)
+    restart: unless-stopped         # restart policy  
+    container_name: demo            # name of the container
+
+networks:                           # define networks
+  frontproxy_fnet:
+    external: true
+  backend:
+    name: demo_backend
+    driver: bridge                  # define network driver
+    driver_opts:                    # disable IPv6
+      com.docker.network.enable_ipv6: "false"
