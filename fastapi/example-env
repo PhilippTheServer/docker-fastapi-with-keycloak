@@ -1,0 +1,4 @@
+KEYCLOAK_URL=https://demo-keycloak.your.domain/
+REALM=your-realm-name
+CLIENT_ID=your-client-ID
+CLIENT_SECRET="your-client-secret"
