@@ -1,0 +1,85 @@
+version: '3'
+services:
+  nginxproxymanager:
+    image: jc21/nginx-proxy-manager:2.12.1
+    ports:
+      - '80:80'
+      - '81:81'
+      - '443:443'
+    environment:
+      DB_MYSQL_HOST: "mysql_npm"
+      DB_MYSQL_PORT: 3306
+      DB_MYSQL_USER: "npm"
+      DB_MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      DB_MYSQL_NAME: "nginxproxymanager"
+    restart: unless-stopped
+    container_name: npm
+    volumes:
+      - ./npm-data:/data
+      - ./npm-ssl:/etc/letsencrypt
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+    networks:
+      fnet:
+        ipv4_address: 172.20.20.10
+      backend:
+    links:
+      - mysql_npm
+      - openresty
+
+  mysql_npm:
+    image: mysql:8.2.0
+    volumes:
+      - ./npm-database:/var/lib/mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: nginxproxymanager
+      MYSQL_USER: npm
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    container_name: npm-mysql
+    command: --default-authentication-plugin=mysql_native_password
+    user: "mysql"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+    networks:
+      fnet:
+        ipv4_address: 172.20.20.11
+      backend:
+
+  openresty:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: resty
+    image: resty
+    restart: unless-stopped
+    expose:
+      - "80"
+    volumes:
+      - "./nginx/nginx.conf:/usr/local/openresty/nginx/conf/nginx.conf"
+      #- "./nginx/error.log:/usr/local/openresty/nginx/logs/error.log"
+      - "./nginx/nginx-conf-files/:/etc/nginx/conf.d"
+    networks:
+      fnet:
+        ipv4_address: 172.20.20.12
+
+networks:
+  fnet:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "false"
+    ipam:
+      driver: default
+      config:
+      - subnet: 172.20.20.0/24
+        gateway: 172.20.20.1
+  backend:
+    name: npm_backend
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "false"
