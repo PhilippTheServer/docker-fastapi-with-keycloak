@@ -1,0 +1,8 @@
+DB_ADDR=mysql_keycloak
+DB_PORT=3306
+DB_DATABASE=keycloak_auth
+DB_USER=keycloak
+DB_PASSWORD=your_password_here
+
+KC_ADMIN=your_admin_username
+KC_ADMIN_PASSWORD=your_admin_password_here

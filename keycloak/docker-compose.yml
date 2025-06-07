@@ -1,0 +1,66 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2.5
+    container_name: keycloak
+    restart: unless-stopped
+    environment:
+      KC_DB: mysql
+      KC_DB_URL: 'jdbc:mysql://${DB_ADDR}:${DB_PORT}/${DB_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8'
+      KC_DB_USERNAME: ${DB_USER}
+      KC_DB_PASSWORD: ${DB_PASSWORD}
+
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD}
+
+      KC_HOSTNAME: 'your-keycloak-domain.com'
+      KC_HOSTNAME_URL: 'https://your-keycloak-domain.com'
+      KC_PROXY_HEADERS: xforwarded
+      KC_PROXY: edge
+
+      KC_HTTP_ENABLED: 'true'
+      KC_HOSTNAME_STRICT: 'false'
+      KC_HOSTNAME_STRICT_HTTPS: 'false'
+
+      KC_LOG_LEVEL: info
+      KC_HEALTH_ENABLED: 'true'
+      KC_METRICS_ENABLED: 'true'
+    command: ['start']
+    depends_on:
+      - mysql_keycloak
+    networks:
+      frontproxy_fnet:
+        ipv4_address: 172.20.20.55
+      keycloak_intern:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+
+  mysql_keycloak:
+    image: mysql:8.2.0
+    volumes:
+      - ./Database:/var/lib/mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: your_root_password_here
+    container_name: keycloak-mysql
+    command: --default-authentication-plugin=mysql_native_password
+    user: "mysql"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+    networks:
+      - keycloak_intern
+
+networks:
+  frontproxy_fnet:
+     external: true
+  keycloak_intern:
+    name: key_backend
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "false"
