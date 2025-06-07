@@ -3,10 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import logging
 
-from routers.name import endpoint
+# from routers.name import endpoint (example import, for a router)
+from routers.demo_router import read_demo
 
 
-app = FastAPI(title="Dev API")
+app = FastAPI(title="Demo API")
 
 
 # Configure logging once at the entry point
@@ -27,6 +28,7 @@ app.add_middleware(
 
 # Example router (you can replace this with your actual router)
 # app.include_router(any_router.router)
+app.include_router(read_demo)
 
 
 if __name__ == "__main__":
