@@ -1,46 +1,88 @@
-from fastapi import HTTPException, Depends
+from fastapi import HTTPException, Depends, Request
 from fastapi.security import OAuth2AuthorizationCodeBearer
 from authlib.integrations.requests_client import OAuth2Session
+import logging
+from typing import Dict, Any, Optional
 import os
-import json
 
+logger = logging.getLogger(__name__)
 
-# Setup environment variables
-KEYCLOAK_URL = os.getenv('KEYCLOAK_URL', 'https://keycloak.example.com/auth/')
-REALM = os.getenv('REALM', 'YourRealm')
-CLIENT_ID = os.getenv('CLIENT_ID', 'your-client-id')
-CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-JWKS_URL = f"{KEYCLOAK_URL}realms/{REALM}/protocol/openid-connect/certs"
+# Get settings once during module initialization
 
 # OAuth2 configuration
 oauth2_scheme = OAuth2AuthorizationCodeBearer(
-    authorizationUrl=f"{KEYCLOAK_URL}realms/{REALM}/protocol/openid-connect/auth",
-    tokenUrl=f"{KEYCLOAK_URL}realms/{REALM}/protocol/openid-connect/token",
+    authorizationUrl=f"https://demo-keycloak.gruppe.ai/realms/demo/protocol/openid-connect/auth",
+    tokenUrl=f"https://demo-keycloak.gruppe.ai/realms/demo/protocol/openid-connect/token",
 )
 
 
-async def validate_keycloak_token(user_token: str = Depends(oauth2_scheme)):
-    auth = OAuth2Session(client_id=CLIENT_ID,
-                         client_secret=CLIENT_SECRET)
-    result = auth.introspect_token(
-        url=f"{KEYCLOAK_URL}realms/{REALM}/protocol/openid-connect/token/introspect",
-        token=user_token,
-    )
 
-    # try:
-    #     token_info = keycloak_openid.decode_token(token, key="RS256")
-    # except KeycloakGetError as exc:
-    #     raise HTTPException(
-    #         status_code=401, detail="Token is invalid or expired") from exc
 
-    token_info = json.loads(result.content.decode())
-    print(token_info)
-    if not token_info["active"]:
-        raise HTTPException(
-            status_code=401, detail="Token is invalid or expired")
-    roles = token_info["realm_access"].get("roles")
-    if "IT-Admin" in roles:
+class KeycloakAuth:
+    """Handles Keycloak authentication and token validation"""
+
+    def __init__(self):
+        self.client_id = os.getenv('CLIENT_ID', 'demo-api')
+        self.client_secret = os.getenv('CLIENT_SECRET', 'censored')
+        self.keycloak_url = os.getenv('KEYCLOAK_URL', 'https://demo-keycloak.gruppe.ai')
+        self.realm = os.getenv('REALM', 'demo')
+        self.required_role = "IT-Admin"
+
+    async def get_token_data(self, token: str) -> Dict[str, Any]:
+        """Introspect the token and return its data"""
+        auth_session = OAuth2Session(
+            client_id=self.client_id,
+            client_secret=self.client_secret
+        )
+
+        try:
+            introspect_url = f"{self.keycloak_url}realms/{self.realm}/protocol/openid-connect/token/introspect"
+            result = auth_session.introspect_token(
+                url=introspect_url,
+                token=token
+            )
+
+            if not result.ok:
+                logger.error(f"Token introspection failed: {result.status_code} - {result.content}")
+                raise HTTPException(status_code=401, detail="Failed to validate token")
+
+            return result.json()
+        except Exception as e:
+            logger.error(f"Error validating token: {str(e)}")
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    async def validate_token(self, token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
+        """
+        Validates the Keycloak token from the request's Authorization header.
+
+        Args:
+            token: The OAuth2 token from the request
+
+        Returns:
+            Dict: Token information when valid
+
+        Raises:
+            HTTPException: When token is invalid or user lacks required permissions
+        """
+        token_info = await self.get_token_data(token)
+
+        if not token_info.get("active", False):
+            raise HTTPException(status_code=401, detail="Token is invalid or expired")
+
+        # Check for required role
+        roles = token_info.get("realm_access", {}).get("roles", [])
+        if self.required_role not in roles:
+            logger.warning(f"User lacks required role '{self.required_role}'. Roles: {roles}")
+            raise HTTPException(status_code=403, detail=f"User does not have the required role: {self.required_role}")
+
         return token_info
 
-    raise HTTPException(
-        status_code=403, detail="User does not have the required role")
+
+# Create a singleton instance for reuse
+keycloak_auth = KeycloakAuth()
+
+
+# Dependency for FastAPI routes
+async def validate_keycloak_token(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
+    """Dependency that validates a Keycloak token and returns the token info"""
+    return await keycloak_auth.validate_token(token)
