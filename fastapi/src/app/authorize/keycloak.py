@@ -24,7 +24,7 @@ class KeycloakAuth:
     def __init__(self):
         self.client_id = os.getenv('CLIENT_ID', 'demo-api')
         self.client_secret = os.getenv('CLIENT_SECRET', 'censored')
-        self.keycloak_url = os.getenv('KEYCLOAK_URL', 'https://demo-keycloak.gruppe.ai')
+        self.keycloak_url = os.getenv('KEYCLOAK_URL', 'https://demo-keycloak.gruppe.ai/')
         self.realm = os.getenv('REALM', 'demo')
         self.required_role = "IT-Admin"
 
